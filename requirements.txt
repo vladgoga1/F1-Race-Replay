@@ -1,0 +1,5 @@
+requests
+pandas
+numpy
+# Only used for circuit corner numbers (fastf1.mvapi). Race data itself comes from OpenF1.
+fastf1

@@ -1,0 +1,408 @@
+/*
+ * THEMES
+ * All colours of the page live in CSS variables ("custom properties"). A rule like
+ * `background: var(--panel)` reads the variable, so switching theme = changing the variables,
+ * which is what the [data-theme] blocks below do. The canvas drawings read the same variables
+ * from the script (see js/theme.js). --accent is set from the settings panel.
+ */
+:root {
+  --bg: #15151e;          --panel: #1f1f2b;       --panel-2: #1a1a24;     --panel-3: #20202e;
+  --control: #2d2d3d;     --control-border: #444; --line: #2d2d3d;        --line-soft: #242433;
+  --hover: #242436;       --selected: #3a3a55;    --tab-active: #2a2a3a;
+  --text: #eee;           --text-2: #cfcfe0;      --muted: #8a8aa0;
+  --track: #3a3a4d;       --overlay: #15151ecc;   --lane: #1d1d2a;        --playhead: #ffffff;
+  --map-text: #ffffff;
+  --accent: #e10600;
+  --sidebar-w: 360px;
+}
+:root[data-theme="light"] {
+  --bg: #eef0f5;          --panel: #ffffff;       --panel-2: #f7f8fb;     --panel-3: #eef0f6;
+  --control: #e3e6ee;     --control-border: #c4c9d6; --line: #d5d9e4;     --line-soft: #e5e8ef;
+  --hover: #e8ebf3;       --selected: #d6dcf2;    --tab-active: #dfe4f2;
+  --text: #1b1b25;        --text-2: #3a3a4a;      --muted: #6a6f85;
+  --track: #c3c8d6;       --overlay: #ffffffdd;   --lane: #e3e6ee;        --playhead: #111111;
+  --map-text: #111111;
+}
+:root[data-theme="midnight"] {
+  --bg: #0a1020;          --panel: #111a30;       --panel-2: #0e1628;     --panel-3: #16213c;
+  --control: #1d2a4a;     --control-border: #2d3d66; --line: #1d2a4a;     --line-soft: #16213c;
+  --hover: #16213c;       --selected: #263b6e;    --tab-active: #1a2848;
+  --text: #e6ecff;        --text-2: #c0cbee;      --muted: #7d8bb5;
+  --track: #2a3a63;       --overlay: #0a1020cc;   --lane: #0f1830;        --playhead: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+header, footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--panel);
+}
+header h1 { font-size: 18px; margin: 0; }
+#hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+footer { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 16px 8px; }
+#controls { display: flex; align-items: center; gap: 12px; }
+
+main { flex: 1; min-height: 0; display: flex; }  /* min-height 0 lets the canvas shrink with the window */
+#mapWrap { flex: 1; min-width: 0; position: relative; }
+canvas { width: 100%; height: 100%; display: block; }
+#timeline { height: auto; }  /* the height is set from the script */
+
+/* Lap counter in the top left corner of the map */
+#lapCounter {
+  position: absolute; top: 12px; left: 16px; pointer-events: none;
+  font-size: 22px; letter-spacing: 1px; color: var(--text); text-shadow: 0 1px 4px var(--bg);
+}
+#lapCounter b { font-size: 34px; }
+#statusBadge {
+  display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 4px;
+  font-size: 14px; font-weight: bold; letter-spacing: 1px; color: #000; text-shadow: none;
+}
+#statusBadge.sc { background: #ff8c1a; }
+#statusBadge.vsc { background: #ffc34d; }
+#statusBadge.yellow { background: #f5e642; }
+#statusBadge.red { background: #ff3b3b; color: #fff; }
+
+/* Event filter chips above the timeline */
+#filters { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.chip small { color: var(--muted); }
+
+#errorBar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 8px 16px;
+  background: #a31212; color: #fff; font-size: 13px; line-height: 1.4;
+}
+#errorBar[hidden] { display: none; }
+
+#tip {
+  position: fixed; z-index: 10; padding: 4px 8px; border-radius: 4px; pointer-events: none;
+  background: #000d; color: #fff; border: 1px solid #555; font-size: 12px; white-space: nowrap;
+}
+
+#sidebar {
+  width: var(--sidebar-w); display: flex; flex-direction: column;
+  background: var(--panel-2); border-left: 1px solid var(--line);
+}
+#tab-leaderboard, #tab-overtakes, #tab-telemetry { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* Focus panel (bottom left of the map) and colour legend of the trace (bottom right) */
+#focusPanel {
+  position: absolute; left: 16px; bottom: 16px; width: 250px; padding: 8px 10px;
+  background: var(--overlay); border: 1px solid var(--track); border-radius: 6px; font-size: 13px;
+}
+#focusPanel[hidden], #trailLegend[hidden], #miniPanel[hidden] { display: none; }
+.fRow { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.fRow .arrow { width: 14px; color: var(--muted); font-size: 11px; }
+.fRow b { font-size: 15px; }
+.fRow .fPos { color: var(--muted); }
+.fRow .fGap { margin-left: auto; font-variant-numeric: tabular-nums; }
+.fRow.none { color: var(--muted); font-size: 12px; }
+.fRow.me { border-top: 1px solid var(--track); border-bottom: 1px solid var(--track); margin: 2px 0; padding: 4px 0; }
+.fTel { margin-top: 6px; }
+#trailLegend {
+  position: absolute; right: 16px; bottom: 16px; display: flex; gap: 12px; padding: 4px 10px;
+  background: var(--overlay); border-radius: 6px; font-size: 12px; pointer-events: none;
+}
+#trailLegend i { display: inline-block; width: 18px; height: 5px; margin-right: 5px; vertical-align: middle; border-radius: 3px; }
+
+/* Mini-sector summary (top right of the map) */
+#miniPanel {
+  position: absolute; right: 16px; top: 12px; min-width: 170px; padding: 8px 10px;
+  background: var(--overlay); border: 1px solid var(--track); border-radius: 6px; font-size: 12px;
+}
+#miniPanel h3 { margin: 0 0 2px; font-size: 13px; }
+#miniPanel p { margin: 0 0 6px; color: var(--muted); font-size: 11px; max-width: 220px; }
+.miniRow { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.miniRow i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.miniRow span { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-2); }
+
+/* Telemetry numbers and bars (used in the focus panel and in the telemetry tab) */
+#tCards { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.tcard { padding: 8px 10px; background: var(--panel-3); border-left: 4px solid; border-radius: 4px; }
+.thead { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.thead span { color: var(--muted); font-size: 11px; }
+.tmain { display: flex; align-items: flex-end; justify-content: space-between; }
+.tspeed b { font-size: 34px; font-variant-numeric: tabular-nums; }
+.tspeed small, .tgear small { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.tgear { text-align: center; }
+.tgear b { display: block; font-size: 30px; line-height: 1; }
+.tbar { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 11px; color: var(--muted); }
+.tbar span { width: 26px; }
+.tbar em { width: 34px; text-align: right; font-style: normal; color: var(--text-2); }
+.bar { flex: 1; height: 8px; background: var(--control); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.bar i.thr { background: #2ecc40; }
+.bar i.brk { background: #ff3b3b; }
+.tnote { margin: 4px 0; font-size: 12px; color: var(--muted); }
+#chartBox { position: relative; height: 270px; margin: 4px 8px 12px; }
+#sidebar [hidden] { display: none; }
+#tabs { display: flex; flex: none; }
+#tabs button { flex: 1; border-radius: 0; border: 0; border-bottom: 2px solid var(--line); padding: 8px; background: var(--panel); }
+#tabs button.active { border-bottom-color: var(--accent); background: var(--tab-active); color: var(--text); }
+
+#otNote { margin: 8px 10px 4px; font-size: 11px; color: var(--muted); line-height: 1.4; }
+#otFilter { display: block; margin: 4px 10px 8px; font-size: 12px; }
+#otList { list-style: none; margin: 0; padding: 0; }
+#otList li { padding: 6px 10px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+#otList li:hover { background: var(--hover); }
+#otList li.selected { background: var(--selected); box-shadow: inset 3px 0 var(--text); }
+#otList li.involved { border-left: 3px solid var(--accent); }
+#otList li.empty { color: var(--muted); cursor: default; }
+.otTop { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
+.otTop span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+.otMain { font-size: 14px; margin: 2px 0; }
+.otInfo { font-size: 11px; color: var(--text-2); }
+
+#leaderboard { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+#leaderboard th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: normal; text-align: left; padding: 6px 4px; }
+#leaderboard td { padding: 3px 4px; border-bottom: 1px solid var(--line-soft); }
+#leaderboard .pos { width: 24px; text-align: right; color: var(--muted); }
+#leaderboard .drv { font-weight: bold; }
+#leaderboard .gap { color: var(--text-2); }
+#leaderboard .team { display: inline-block; width: 4px; height: 14px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+#leaderboard .pits { text-align: center; color: var(--muted); }
+#leaderboard tr.dns { opacity: 0.45; }
+#leaderboard tbody tr { cursor: pointer; }
+#leaderboard tbody tr:hover { background: var(--hover); }
+#leaderboard tr.hl { background: var(--selected); box-shadow: inset 3px 0 var(--text); }
+#leaderboard tr.hl .drv { color: var(--text); }
+.tyreIcon {
+  display: inline-block; width: 18px; height: 18px; line-height: 14px; margin-right: 6px;
+  border: 2px solid; border-radius: 50%; text-align: center; font-size: 10px; font-weight: bold;
+}
+
+button, select {
+  background: var(--control);
+  color: var(--text);
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+#scrubber { flex: 1; accent-color: var(--accent); }
+#timeLabel { font-variant-numeric: tabular-nums; min-width: 60px; }
+
+/* Settings panel (opened with the gear button in the header) */
+#settingsBtn { margin-left: 4px; }
+#settings {
+  position: fixed; top: 46px; right: 12px; z-index: 25; width: 340px; max-height: calc(100vh - 70px);
+  overflow-y: auto; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 8px 30px #0008; font-size: 13px;
+}
+#settings[hidden] { display: none; }
+#settings h2 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; }
+#settings h2 button { margin-left: auto; }
+#settings h3 { margin: 14px 0 4px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+#settings .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+#settings .row label { flex: 1; }
+#settings .row input[type=text] { width: 150px; background: var(--control); color: var(--text); border: 1px solid var(--control-border); border-radius: 4px; padding: 3px 6px; }
+#settings .row input[type=color] { width: 44px; height: 24px; padding: 0; border: 0; background: none; }
+#settings .hintText { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+
+/* Panel switches from the settings panel: the script puts these classes on <body> */
+body.hide-lapcounter #lapCounter { display: none; }
+body.hide-timeline #timeline, body.hide-timeline #filters { display: none; }
+body.hide-focuspanel #focusPanel { display: none !important; }
+body.hide-legend #trailLegend { display: none !important; }
+body.hide-col-tyre #leaderboard .tyre, body.hide-col-tyre #leaderboard th:nth-child(4) { display: none; }
+body.hide-col-pits #leaderboard .pits, body.hide-col-pits #leaderboard th:nth-child(5) { display: none; }
+body.sidebar-left main { flex-direction: row-reverse; }
+body.sidebar-left #sidebar { border-left: 0; border-right: 1px solid var(--line); }
+
+/* Races panel (the Races button in the header): pick races to export, progress, cache */
+#racesBtn { margin-left: 4px; }
+#manager {
+  position: fixed; top: 46px; right: 12px; z-index: 25; width: 420px; max-height: calc(100vh - 70px);
+  overflow-y: auto; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 8px 30px #0008; font-size: 13px;
+}
+#manager[hidden] { display: none; }
+#manager h2 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; }
+#manager h2 button { margin-left: auto; }
+#manager h3 { margin: 14px 0 4px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; }
+#manager h3 button { margin-left: auto; text-transform: none; letter-spacing: 0; }
+#manager .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+#manager .row label { flex: 1; }
+#manager .hintText { margin: 2px 0 6px; font-size: 11px; color: var(--muted); }
+#manager .error { color: #ff6b5e; font-size: 12px; white-space: pre-wrap; margin: 4px 0; }
+#manager button.small { padding: 2px 8px; font-size: 11px; }
+#manager button.primary { background: var(--accent); border-color: var(--accent); color: #fff; margin-top: 4px; }
+#manager button:disabled { opacity: 0.45; cursor: default; }
+#manager .raceList { max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+#manager .raceItem { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+#manager .raceItem:last-child { border-bottom: 0; }
+#manager .raceItem:hover { background: var(--hover); }
+#manager .raceName { flex: 1; }
+#manager .raceDate, #manager .size { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+#manager .badge { min-width: 64px; text-align: center; font-size: 10px; border-radius: 9px; padding: 1px 6px; }
+#manager .badge.exported { background: #1f6f3f; color: #fff; }
+#manager .badge.exporting { background: var(--accent); color: #fff; }
+#manager .badge.not-run-yet { background: var(--control); color: var(--muted); }
+#manager .keepRow { display: block; margin: 8px 0 2px; }
+#manager .job { padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+#manager .jobTop { display: flex; align-items: center; gap: 8px; }
+#manager .jobTop b { flex: 1; }
+#manager .jobStatus { color: var(--muted); font-size: 11px; }
+#manager .job.done .jobStatus { color: #2ecc71; }
+#manager .job.error .jobStatus { color: #ff6b5e; }
+#manager .bar { height: 6px; border-radius: 3px; background: var(--control); margin: 6px 0 2px; overflow: hidden; }
+#manager .barFill { height: 100%; background: var(--accent); transition: width 0.5s; }
+#manager .exportedItem { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+#manager .exportedItem.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; }
+
+/* Messages tab (race director messages) */
+#tab-messages { padding: 8px 10px; }
+#rcFilters { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin-bottom: 6px; }
+#rcList { list-style: none; margin: 0; padding: 0; }
+#rcList li { padding: 5px 8px; margin-bottom: 4px; border-left: 4px solid var(--muted); background: var(--panel-2); border-radius: 0 4px 4px 0; cursor: pointer; font-size: 12px; }
+#rcList li:hover { background: var(--hover); }
+#rcList li.future { opacity: 0.45; }
+#rcList li.empty { border-left-color: transparent; color: var(--muted); cursor: default; }
+#rcList .rcWhen { color: var(--muted); font-size: 11px; }
+#rcList .rcText { margin-top: 1px; line-height: 1.3; }
+#tab-messages .hintText { margin: 2px 0 6px; font-size: 11px; color: var(--muted); }
+
+/* Highlights bar (over the map, bottom centre) */
+#hlBar {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center;
+  gap: 8px; max-width: calc(100% - 24px); padding: 6px 12px; background: var(--overlay); border: 1px solid var(--accent);
+  border-radius: 8px; font-size: 12px;
+}
+#hlBar[hidden] { display: none; }
+#hlBar b { color: var(--accent); letter-spacing: 1px; }
+#hlBar button { padding: 1px 8px; }
+#hlCounter { font-variant-numeric: tabular-nums; min-width: 46px; text-align: center; }
+#hlText { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Race trace (covers the map) */
+#tracePanel { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; background: var(--bg); }
+#tracePanel[hidden] { display: none; }
+#tracePanel .traceBar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+#tracePanel .traceBar .hintText { flex: 1; font-size: 11px; color: var(--muted); }
+#tracePanel .traceChart { position: relative; flex: 1; min-height: 0; padding: 8px 12px 12px; }
+
+/* Four tabs fit in the side panel: smaller padding, no line breaks */
+#tabs button { white-space: nowrap; font-size: 12px; padding: 8px 4px; }
+#hlBar label { white-space: nowrap; }
+#hlText { flex: 1; min-width: 0; }
+
+/* Weather (under the lap counter) */
+#weather { display: inline-block; margin-top: 6px; padding: 3px 8px; font-size: 11px; letter-spacing: 0; line-height: 1.5; color: var(--muted); background: var(--overlay); border-radius: 6px; text-shadow: none; }
+#weather[hidden] { display: none; }
+#weather b { color: var(--text); font-size: 12px; font-weight: 600; margin-right: 6px; }
+#weather .windArrow { display: inline-block; font-style: normal; color: var(--text); }
+#weather .rainBadge { display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 4px; background: #2f7fff; color: #fff; font-weight: bold; letter-spacing: 1px; }
+body.hide-weather #weather { display: none !important; }
+
+/* Sectors table (top right of the map, like the mini-sector summary) */
+#secPanel {
+  position: absolute; right: 16px; top: 12px; min-width: 190px; padding: 8px 10px;
+  background: var(--overlay); border: 1px solid var(--track); border-radius: 6px; font-size: 12px;
+}
+#secPanel[hidden] { display: none; }
+#secPanel h3 { margin: 0 0 4px; font-size: 13px; }
+.secRow { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.secRow i { width: 12px; height: 12px; border-radius: 2px; display: inline-block; background: var(--control); }
+.secRow b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.secRow span { width: 52px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.secRow.total { border-top: 1px solid var(--track); margin-top: 3px; padding-top: 4px; }
+.secLegend { margin-top: 6px; font-size: 10px; color: var(--muted); }
+.secLegend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 6px; vertical-align: middle; }
+.secLegend i:first-child { margin-left: 0; }
+
+/* Tabs: six of them, on two rows when the side panel is narrow */
+#tabs { flex-wrap: wrap; }
+#tabs button { flex: 1 1 auto; }
+#tab-battles, #tab-radio, #tab-messages { flex: 1; min-height: 0; overflow-y: auto; }
+#tab-battles .hintText, #tab-radio .hintText { margin: 8px 10px 4px; font-size: 11px; color: var(--muted); line-height: 1.4; }
+.tabFilters { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 2px 10px 6px; font-size: 12px; }
+#btList, #rdList { list-style: none; margin: 0; padding: 0; }
+#btList li { padding: 6px 10px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+#btList li:hover { background: var(--hover); }
+#btList li.selected { background: var(--selected); box-shadow: inset 3px 0 var(--text); }
+#btList li.involved { border-left: 3px solid var(--accent); }
+#btList li.empty { color: var(--muted); cursor: default; }
+#btList .liveTag { margin-left: auto; padding: 0 6px; border-radius: 3px; background: #ff8c1a; color: #000; font-weight: bold; font-size: 10px; }
+
+/* Team radio */
+#rdList li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-left: 4px solid var(--muted); border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+#rdList li:hover { background: var(--hover); }
+#rdList li.playing { background: var(--selected); }
+#rdList li.future { opacity: 0.45; }
+#rdList li.empty { color: var(--muted); cursor: default; border-left-color: transparent; }
+#rdList button { flex: none; width: 28px; height: 28px; padding: 0; border-radius: 50%; }
+#rdList .rcWhen { color: var(--muted); font-size: 11px; }
+#rdList .rcText em { color: var(--muted); font-size: 11px; margin-left: 6px; }
+
+/* Driver comparison (Telemetry tab) */
+#cmpBar { padding: 4px 10px 8px; font-size: 12px; }
+#cmpBox { padding: 0 8px 12px; }
+#cmpBox .cmpRow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+#cmpBox .cmpRow select { max-width: 130px; }
+#cmpBox #cmpLap { max-width: 100%; }
+#cmpBox .hintText { margin: 4px 2px; font-size: 11px; color: var(--muted); line-height: 1.4; }
+.cmpChart { position: relative; height: 190px; }
+.cmpChart.short { height: 130px; }
+
+/* Keyboard shortcuts panel */
+#keysBtn { margin-left: 4px; }
+#keysHelp {
+  position: fixed; top: 46px; right: 12px; z-index: 25; width: 400px; padding: 12px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 30px #0008; font-size: 13px;
+}
+#keysHelp[hidden] { display: none; }
+#keysHelp h2 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; }
+#keysHelp h2 button { margin-left: auto; }
+#keysHelp td { padding: 3px 8px 3px 0; vertical-align: top; }
+#keysHelp td:first-child { white-space: nowrap; }
+kbd { display: inline-block; min-width: 18px; padding: 1px 6px; text-align: center; font: 11px system-ui; background: var(--control); border: 1px solid var(--control-border); border-radius: 4px; }
+
+/* Highlights bar: the extra checkbox */
+#hlBar label { white-space: nowrap; }
+
+/* Side tabs can be dragged: a line shows where the tab will land */
+#tabs button { cursor: grab; }
+#tabs button.dropBefore { box-shadow: inset 3px 0 var(--accent); }
+#tabs button.dropAfter { box-shadow: inset -3px 0 var(--accent); }
+#hlOnlyLabel.off { opacity: 0.5; }
+
+/* Floating windows (js/floating.js): a side tab dragged onto the map. They sit above the map and
+   below the settings / keys panels; the stacking order (z-index) is set by the script. */
+#floatLayer { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.floatWin {
+  position: absolute; box-sizing: border-box; pointer-events: auto; min-width: 200px; min-height: 110px;
+  display: flex; flex-direction: column; overflow: hidden;
+  resize: both;                                      /* the browser draws a handle in the bottom right corner */
+  border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .5);
+}
+.floatWin::after {                                   /* a visible hint for the resize handle */
+  content: ""; position: absolute; right: 2px; bottom: 2px; width: 12px; height: 12px; pointer-events: none;
+  background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 58%, transparent 58%, transparent 74%, var(--muted) 74%, var(--muted) 82%, transparent 82%);
+}
+.floatHead {
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; cursor: move; touch-action: none;
+  background: var(--panel); border-bottom: 2px solid var(--accent); user-select: none;
+}
+.floatTitle { flex: 1; font-weight: bold; font-size: 13px; }
+.floatHead input[type=range] { width: 70px; cursor: pointer; }
+.floatHead button { padding: 2px 8px; font-size: 12px; }
+.floatBody { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel-2); }
+.floatBody > div { flex: 1; min-height: 0; overflow-y: auto; }
+.floatWin [hidden] { display: none; }
+#sidebar.empty { display: none; }

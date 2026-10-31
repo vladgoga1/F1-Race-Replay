@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>F1 Race Replay</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>F1 Race Replay</h1>
+    <select id="raceSelect"></select>
+    <label>Focus <select id="focusSelect"><option value="">Off</option></select></label>
+    <label>Zoom
+      <select id="zoomSelect">
+        <option value="250">Close</option>
+        <option value="500" selected>Medium</option>
+        <option value="900">Wide</option>
+      </select>
+    </label>
+    <span id="hint">Click a driver in the table or on the map to highlight them</span>
+    <button id="keysBtn" title="Keyboard shortcuts (?)">&#9000; Keys</button>
+    <button id="racesBtn" title="Choose and export races">&#8681; Races</button>
+    <button id="settingsBtn" title="Personalize the pitwall">&#9881; Settings</button>
+  </header>
+
+  <div id="manager" hidden>
+    <h2>Races <button id="managerClose">Close</button></h2>
+    <div id="managerBody"></div>
+  </div>
+
+  <div id="keysHelp" hidden>
+    <h2>Keyboard shortcuts <button id="keysClose">Close</button></h2>
+    <table>
+      <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+      <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>5 seconds back / forward (with <kbd>Shift</kbd>: 30 s)</td></tr>
+      <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next lap (in Highlights: previous / next moment)</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Focus on the highlighted driver (or the leader); again to leave</td></tr>
+      <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>Speed 1x, 2x, 5x, 10x</td></tr>
+      <tr><td><kbd>H</kbd></td><td>Highlights mode on / off</td></tr>
+      <tr><td><kbd>T</kbd></td><td>Race trace on / off</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Sectors on / off</td></tr>
+      <tr><td><kbd>M</kbd></td><td>Mini-sectors on / off</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close panels, remove the mark of an overtake</td></tr>
+      <tr><td><kbd>?</kbd></td><td>This list</td></tr>
+    </table>
+  </div>
+
+  <div id="settings" hidden>
+    <h2>Settings <button id="settingsReset" title="Back to the default settings">Reset</button><button id="settingsClose">Close</button></h2>
+    <div id="settingsForm"></div>
+    <p class="hintText">Your choices are saved in this browser only.</p>
+  </div>
+
+  <main>
+    <div id="mapWrap">
+      <canvas id="map"></canvas>
+      <div id="lapCounter">
+        <div>LAP <b id="lapNow">1</b> / <span id="lapTotal">-</span></div>
+        <div id="statusBadge" hidden></div>
+        <div id="weather" hidden></div>
+      </div>
+      <div id="miniPanel" hidden></div>
+      <div id="secPanel" hidden></div>
+      <div id="hlBar" hidden>
+        <b>HIGHLIGHTS</b>
+        <button id="hlPrev" title="Previous moment">&#9664;</button>
+        <span id="hlCounter"></span>
+        <button id="hlNext" title="Next moment">&#9654;</button>
+        <span id="hlText"></span>
+        <label title="The camera goes to the place of the moment"><input type="checkbox" id="hlZoom" checked> Zoom on the action</label>
+        <label id="hlOnlyLabel" title="Play only the moments that involve the drivers you highlighted (click a driver in the leaderboard or on the map). Moments of the whole race, like the Safety Car, are still played."><input type="checkbox" id="hlOnly"> Only moments of my highlighted drivers</label>
+      </div>
+      <div id="tracePanel" hidden>
+        <div class="traceBar">
+          <b>Race trace</b>
+          <label>Gap to <select id="traceRef"></select></label>
+          <label>Range
+            <select id="traceRange">
+              <option value="auto">Auto</option><option value="all">All</option><option value="30">30 s</option>
+              <option value="60">60 s</option><option value="120">120 s</option>
+            </select>
+          </label>
+          <span class="hintText">Click a line to highlight a driver, click elsewhere to jump to that lap. Dots = pit stops.</span>
+          <button id="traceClose">Close</button>
+        </div>
+        <div class="traceChart"><canvas id="traceCanvas"></canvas></div>
+      </div>
+      <div id="focusPanel" hidden></div>
+      <div id="trailLegend" hidden>
+        <span><i style="background:#2ecc40"></i>accelerating</span>
+        <span><i style="background:#ff3b3b"></i>braking</span>
+        <span><i style="background:#ffdc00"></i>coasting</span>
+      </div>
+    </div>
+    <aside id="sidebar">
+      <div id="tabs">
+        <button data-tab="leaderboard" class="active">Leaderboard</button>
+        <button data-tab="overtakes">Overtakes <span id="otCount"></span></button>
+        <button data-tab="battles">Battles <span id="btCount"></span></button>
+        <button data-tab="telemetry">Telemetry</button>
+        <button data-tab="messages">Messages <span id="rcCount"></span></button>
+        <button data-tab="radio">Radio <span id="rdCount"></span></button>
+      </div>
+      <div id="tab-leaderboard">
+        <table id="leaderboard"></table>
+      </div>
+      <div id="tab-overtakes" hidden>
+        <p id="otNote"></p>
+        <label id="otFilter"><input type="checkbox" id="otOnlyHl"> Only highlighted drivers</label>
+        <ul id="otList"></ul>
+      </div>
+      <div id="tab-battles" hidden>
+        <p id="btNote" class="hintText"></p>
+        <div class="tabFilters">
+          <label><input type="checkbox" id="btLines" checked> Draw lines between the cars on the map</label>
+          <label><input type="checkbox" id="btOnlyHl"> Only highlighted drivers</label>
+        </div>
+        <ul id="btList"></ul>
+      </div>
+      <div id="tab-radio" hidden>
+        <p id="rdNote" class="hintText"></p>
+        <div id="rdFilters" class="tabFilters"></div>
+        <ul id="rdList"></ul>
+      </div>
+      <div id="tab-messages" hidden>
+        <div id="rcFilters"></div>
+        <p id="rcNote" class="hintText"></p>
+        <ul id="rcList"></ul>
+      </div>
+      <div id="tab-telemetry" hidden>
+        <div id="tCards"></div>
+        <div id="cmpBar"><label><input type="checkbox" id="cmpOn"> Compare two drivers on the same lap</label></div>
+        <div id="cmpBox" hidden>
+          <div class="cmpRow">
+            <select id="cmpA"></select> <span>vs</span> <select id="cmpB"></select>
+            <select id="cmpLap"></select>
+          </div>
+          <p id="cmpInfo" class="hintText"></p>
+          <div class="cmpChart"><canvas id="cmpSpeed"></canvas></div>
+          <div class="cmpChart short"><canvas id="cmpDelta"></canvas></div>
+          <p class="hintText">Below: how far the second driver is behind the first one at each point of the lap (down = slower).</p>
+        </div>
+        <div id="chartBox"><canvas id="speedChart"></canvas></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div id="filters"></div>
+    <canvas id="timeline"></canvas>
+    <div id="controls">
+      <button id="playBtn">Play</button>
+      <span id="speedBtns">
+        <button data-speed="1" class="active">1x</button>
+        <button data-speed="2">2x</button>
+        <button data-speed="5">5x</button>
+        <button data-speed="10">10x</button>
+      </span>
+      <label>Lap <select id="lapSelect"></select></label>
+      <button id="miniBtn" title="Colour the track by the fastest driver in each of 25 mini-sectors">Mini-sectors</button>
+      <select id="miniLap" hidden title="Which lap the mini-sectors / sectors show"></select>
+      <button id="secBtn" title="The 3 official sectors, coloured like the TV timing: purple = best so far, green = personal best, yellow = slower">Sectors</button>
+      <select id="secDriver" hidden title="Colour the sectors for this driver, or by who was fastest in the lap"><option value="">Fastest in lap</option></select>
+      <button id="hlBtn" title="Play only the interesting moments (what the timeline shows, except yellow flags)">Highlights</button>
+      <button id="traceBtn" title="Gap of every driver after every lap">Race trace</button>
+      <input type="range" id="scrubber" min="0" max="1" step="0.1" value="0">
+      <span id="timeLabel">0:00:00</span>
+    </div>
+  </footer>
+
+  <div id="floatLayer"></div>
+  <div id="tip" hidden></div>
+  <div id="errorBar" hidden></div>
+
+  <!-- Version of this HTML file. js/main.js has its own number: if they differ, the browser is
+       mixing an old cached file with a new one, and the page says so. Keep both in step. -->
+  <script>window.PAGE_VERSION = 12;</script>
+  <!-- Chart.js 4.4.1, saved locally so the page also works offline. It defines the global "Chart". -->
+  <script src="lib/chart.umd.min.js"></script>
+  <!-- type="module" lets us split the code in files and use import/export -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

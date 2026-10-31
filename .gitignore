@@ -1,0 +1,19 @@
+# Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Downloaded / exported race data: big, and everybody can regenerate it (see README: "Export a race")
+cache/
+data/
+
+# Editor and tool folders (personal settings, local paths)
+.idea/
+.vscode/
+.agents/
+.gemini/
+.claude/
+
+# Personal notes for AI assistants
+CLAUDE.md
+Claude.md
