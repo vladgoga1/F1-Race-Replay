@@ -82,8 +82,8 @@ page (Canvas 2D and Chart.js, no framework, no backend) that plays them.
   overtakes between them. Click one to jump to its start. While a battle is in progress (LIVE) the map
   draws a dashed line between the two cars with the gap; untick the box to hide the lines. In 2026,
   "less than 1 s" is the Overtake Mode range (an estimate, like everywhere in 2026).
-- **Side by side:** two moving cars less than one car length (5.6 m) apart along the racing line get a
-  white bar across the track and "side by side?" on the map (in focus mode only those near the driver).
+- **Side by side (an estimate):** two moving cars less than 4 m apart along the racing line get a
+  white bar across the track (in focus mode only those near the driver).
 - **Driver comparison (Telemetry tab):** tick *Compare two drivers on the same lap*, choose two drivers
   and a lap (or follow the first driver's lap). The top graph overlays their speed against the distance
   in the lap, the bottom one shows how far the second is behind the first at every point (down =

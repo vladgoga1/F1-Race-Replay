@@ -24,7 +24,7 @@ import { formatTime, retirementTimes } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
 
-const JS_VERSION = 14;   // must match window.PAGE_VERSION in index.html
+const JS_VERSION = 15;   // must match window.PAGE_VERSION in index.html
 
 // Show a problem on the page instead of failing silently (the browser console is easy to miss).
 function showError(text) {

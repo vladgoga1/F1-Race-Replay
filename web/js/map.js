@@ -377,7 +377,7 @@ export class TrackMap {
 
   /*
    * SIDE BY SIDE (an estimate, see Replay.sideBySide). Both cars are on the same line, so they are
-   * drawn on top of each other: a short bar across the track and "side by side?" mark the pair.
+   * drawn on top of each other: a short white bar across the track marks the pair (no text: it crowded the map at the start).
    * We do not know who is on the inside, so the cars are not moved sideways.
    * In focus mode only the pairs with the focused driver or one of his two neighbours.
    */
@@ -391,9 +391,6 @@ export class TrackMap {
     const ctx = this.ctx;
     const half = this.carRadius(view.options, this.sizeFactor()) * 1.3;   // a bit wider than a car
     ctx.save();
-    ctx.font = "bold 11px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
     ctx.lineCap = "round";
     for (const [a, b] of pairs) {
       const pa = replay.positionOf(a);
@@ -411,18 +408,6 @@ export class TrackMap {
       ctx.lineWidth = 2.5;
       ctx.strokeStyle = "#ffffff";
       ctx.stroke();
-      const text = "side by side?";
-      const w = ctx.measureText(text).width;
-      const ty = my - half - 10;
-      const rect = { x: mx - w / 2, y: ty - 7, w, h: 14 };
-      // A pack (the start) gives many pairs close together: their texts would cover each other, so only the bar.
-      if (this.gapLabels.some((r) => rect.x < r.x + r.w && r.x < rect.x + rect.w && rect.y < r.y + r.h && r.y < rect.y + rect.h)) continue;
-      this.gapLabels.push(rect);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#000000bb";
-      ctx.strokeText(text, mx, ty);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, mx, ty);
     }
     ctx.restore();
   }
