@@ -28,6 +28,7 @@ export const DEFAULTS = {
   carStyle: "pixel",          // pixel | dot
   dotSize: 6,                 // size of a car: radius of the dot, or 1/5 of the length of the pixel car
   showMiniLabels: true,       // driver abbreviations on the mini-sectors
+  autoCamera: true,           // zoom on the pack when the cars are close together (start, safety car)
   // Telemetry
   units: "kmh",               // kmh | mph
   // Start-up
@@ -62,6 +63,7 @@ export const FIELDS = [
   { key: "showLabels", label: "Driver names next to the cars", type: "checkbox" },
   { key: "dotSize", label: "Car size", type: "range", min: 4, max: 9 },
   { key: "showMiniLabels", label: "Names on the mini-sectors", type: "checkbox" },
+  { key: "autoCamera", label: "Zoom on the pack automatically (start, safety car)", type: "checkbox" },
 
   { section: "Telemetry" },
   { key: "units", label: "Speed unit", type: "select", options: [["kmh", "km/h"], ["mph", "mph"]] },

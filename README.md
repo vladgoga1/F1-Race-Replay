@@ -17,11 +17,26 @@ page (Canvas 2D and Chart.js, no framework, no backend) that plays them.
   team colours (the two cars of a team differ by a white or black stripe), pointing the way it
   drives, with its abbreviation. Play/pause, 1x / 2x / 5x / 10x, scrubber and lap selector. A lap
   counter sits in the top left, with a badge during a Safety Car, Virtual Safety Car or flag.
+- **Map camera:** with *Auto zoom* on (top right of the map, also in Settings) the map zooms on the
+  cars when they are close together (the start, behind the safety car) and zooms back out as they
+  spread; a car standing still while the others race (stalled, in the pit box) and retired cars are
+  left out. The mouse wheel zooms around the pointer, dragging moves the map, `+` / `-` / *Fit* (key
+  `0`) do the same; *Fit* goes back to the automatic view. In Focus and Highlights the wheel sets how
+  much you see around the car. Cars are drawn smaller when the whole track is on screen and bigger
+  when zoomed in, and the names never overlap: a name that has no room moves to another side of its
+  car, then shrinks to the race position ("7"), then disappears (highlighted drivers always keep it).
 - **Leaderboard:** position, driver, gap to the car ahead, tyre compound (S/M/H/I/W), laps on the
   current set and number of pit stops. Retired cars show OUT, non-starters DNS.
 - **Timeline** under the map: overtakes, pit stops, Safety Car / VSC, yellow and red flags,
-  retirements and the fastest lap. Click a marker to jump there (3 s before the event), hover to
-  read it, use the checkboxes to filter by type.
+  retirements, the fastest lap and track limits. Click a marker to jump there (3 s before the event),
+  hover to read it, use the checkboxes to filter by type.
+- **Track limits:** deleted lap times ("time deleted", "lap deleted") and "leaving the track and
+  gaining an advantage" incidents, from the race director's messages, with the stewards' latest
+  decision (noted / under investigation / no further action / 5 s penalty ...). They have their own
+  lane in the timeline. While the replay passes one, a small green warning sign appears for a few
+  seconds at the turn, with the text (e.g. `BOR T1 · time deleted`); with highlighted drivers (or in
+  focus mode) only theirs. Switching "Track limits" off in the timeline hides them on the map too.
+  They are not played in Highlights mode (too many).
 - **Overtakes tab:** every detected overtake with lap, nearest corner, who passed whom, speed
   difference at the pass and DRS / Overtake Mode information. Click one to jump there; the place
   is marked on the map.
@@ -67,6 +82,8 @@ page (Canvas 2D and Chart.js, no framework, no backend) that plays them.
   overtakes between them. Click one to jump to its start. While a battle is in progress (LIVE) the map
   draws a dashed line between the two cars with the gap; untick the box to hide the lines. In 2026,
   "less than 1 s" is the Overtake Mode range (an estimate, like everywhere in 2026).
+- **Side by side:** two moving cars less than one car length (5.6 m) apart along the racing line get a
+  white bar across the track and "side by side?" on the map (in focus mode only those near the driver).
 - **Driver comparison (Telemetry tab):** tick *Compare two drivers on the same lap*, choose two drivers
   and a lap (or follow the first driver's lap). The top graph overlays their speed against the distance
   in the lap, the bottom one shows how far the second is behind the first at every point (down =
@@ -246,14 +263,35 @@ OpenF1 API --> python/ (load, detect, export) --> data/<race>/*.json --> web/ (H
   adjacent in the order with an interval of 1 s or less for 3 laps (gaps of up to 20 s in the contact
   are bridged) make a battle. Pit stops, safety car / VSC / red flag periods, retired and finished cars
   are left out.
+- `detect_track_limits.py` reads the race control messages about deleted lap times and about leaving
+  the track (regular expressions, explained in the file). The messages of one incident (noted, under
+  investigation, decision) become one event with the latest outcome. A message is published 1-9
+  minutes after the fact, but its text ends with the clock time of the fact (local time at the
+  track, e.g. `14:24:36`): with the session's `gmt_offset` from OpenF1 this becomes race time.
+  Checked on 4 races: the driver went through the named turn 2 s (median, at most 6 s) from that
+  clock time, so the event is moved to that exact pass (the car is at the mark when it shows).
+  Older messages without a clock time (2023-2025 incidents) use the last pass of the driver through
+  that turn before the message. The place is the turn's position from the corner list.
 - `export_weather.py` and `export_teamradio.py` copy OpenF1's `weather` and `team_radio` tables.
+- `track_line.py` builds the **racing line**. OpenF1 does not send where a car really is on the
+  tarmac: all positions on track are snapped to one line (95-98% of the samples are within 0.5 m
+  of the fastest lap's path, two cars at the same spot get the same point). Only the pit lane is
+  off it. So the script takes the samples of all cars and laps, cuts the lap into 2 m pieces and
+  keeps the median point of each piece: a line with a point every 2 m that starts at the
+  start/finish line (track.json `line`; the samples lie 0.03 m from it, median). Then, for every
+  car, it measures the distance driven along that line (positions.json `s`, in 1/10 m, growing lap
+  after lap, `null` in the pit lane or where data is missing), lightly smoothed because OpenF1's
+  time stamps are noisy (about +-4 m).
 - `export_json.py` (with `export_leaderboard.py`, `export_telemetry.py`, `export_minisectors.py` and
   the exporters above) writes the JSON files.
 - In the browser, `replay.js` runs the clock and **interpolates** positions: the file holds one
-  position per second but the screen redraws about 60 times per second, so each frame draws the
-  point on the straight line between the two nearest samples
-  (`position = p0 + (p1 - p0) * f`, with `f` from 0 to 1). Without it the cars would jump once
-  per second. The explanation with an example is in the comments of `web/js/replay.js`.
+  position per second but the screen redraws about 60 times per second, so each frame draws a
+  point between the two nearest samples (`value = v0 + (v1 - v0) * f`, with `f` from 0 to 1).
+  Without it the cars would jump once per second. On track it interpolates the distance along the
+  racing line and draws the car at that point of the line, so the cars follow the curves (a
+  straight line between two X/Y samples 83 m apart would cut every corner) and point along the
+  line. In the pit lane, or for races exported before the racing line existed, it interpolates
+  X/Y directly. The explanation with an example is in the comments of `web/js/replay.js`.
 
 ## Project structure
 ```
@@ -271,6 +309,15 @@ cache/     downloaded OpenF1 data; created by the export script
   drivers were braking for.
 - Some races have gaps in OpenF1 data (for example a stint without a tyre compound, shown as `?`).
 - A few position samples per car jump by 150-300 m for one second (a data glitch).
+- All cars on track move along ONE line, because that is all OpenF1 positions contain: two cars
+  side by side, or one on the inside and one on the outside of a corner, are drawn one behind the
+  other. Who is ahead is right, the sideways position is not known. The pit lane is not drawn.
+- "Side by side?" on the map is an estimate from the distance along the line only: it can also mark a
+  car right behind another, and who is on the inside or outside is unknown.
+- The line is 0.5-2% shorter than the official circuit length (Monza 5762 m vs 5793 m, Albert Park
+  5243 m vs 5278 m): OpenF1's coordinates are slightly smaller than reality.
+- Races exported before the racing line existed still work (cars move on straight lines between
+  samples, cutting the corners a little); export them again to get the smooth movement.
 - Mini-sector times come from the 4 Hz position data, so they are accurate to roughly 0.05-0.1 s;
   two drivers within that margin can be swapped. A mini-sector time that is implausibly short is
   ignored. Races exported before stage 5 need a re-export to get mini-sectors.
@@ -281,6 +328,10 @@ cache/     downloaded OpenF1 data; created by the export script
 - A battle only needs the official order and the intervals, so it can also count cars that ran close
   because the one in front was slow, not because they were fighting.
 - Team radio: the links come from OpenF1 and may stop working; some races have no clips.
+- Track limits: only what race control reports (deleted lap times and "leaving the track" incidents;
+  the black-and-white flag warnings are only in the Messages tab). The position data cannot show a
+  car leaving the track, so the mark is placed at the TURN named in the message, not at the exact
+  spot. Races exported before this feature have no track limits events: export them again.
 
 ## Troubleshooting
 - **The page is empty or shows an error:** start the server from the project root, and export at

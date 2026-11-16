@@ -24,7 +24,7 @@ import { formatTime, retirementTimes } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
 
-const JS_VERSION = 12;   // must match window.PAGE_VERSION in index.html
+const JS_VERSION = 14;   // must match window.PAGE_VERSION in index.html
 
 // Show a problem on the page instead of failing silently (the browser console is easy to miss).
 function showError(text) {
@@ -47,7 +47,7 @@ const settings = new Settings();   // the user's personal settings (see settings
 // What the user has chosen to look at. Shared by the map, the leaderboard, the timeline and the list.
 const state = {
   highlighted: new Set(),   // abbreviations of the highlighted drivers
-  selected: null,           // the selected overtake (marked on the map), or null
+  selected: null,           // the selected overtake or track limits event (marked on the map), or null
   onlyHighlighted: false,   // overtake list: show only overtakes of highlighted drivers
   focusAbbr: null,          // driver the camera follows (focus mode), or null
   zoomMetres: 500,
@@ -67,6 +67,9 @@ const state = {
   battleLines: true,        // draw lines between the cars of the battles in progress
   btOnlyHighlighted: false, // battle list: only battles of highlighted drivers
   battleLinks: [],          // recomputed every frame: the lines for the map
+  retiredAt: {},            // abbreviation -> time of retirement (for the automatic camera)
+  follow: false,            // the camera follows the highlighted drivers (without hiding the others)
+  hiddenTypes: new Set(),   // the event types switched off in the timeline (the timeline's own Set)
 };
 
 let replay = null;
@@ -135,7 +138,8 @@ function selectEvent(event) {
   }
   replay.seek(event.t - PRE_ROLL);
   // Overtakes are also marked on the map; clicking the selected one again removes the mark.
-  state.selected = event.type === "overtake" && state.selected !== event ? event : null;
+  const marked = event.type === "overtake" || event.type === "limits";
+  state.selected = marked && state.selected !== event ? event : null;
   refreshOvertakeList();
 }
 
@@ -211,6 +215,7 @@ async function startRace(folder) {
   state.focusAbbr = null;
   state.telemetry = new TelemetryStore(folder);
   retiredAt = retirementTimes(race.events);
+  state.retiredAt = retiredAt;             // the automatic camera leaves retired cars out
 
   replay = new Replay(race);
   map = new TrackMap($("map"), race.track);
@@ -218,6 +223,7 @@ async function startRace(folder) {
   leaderboard = new Leaderboard($("leaderboard"), race, toggleHighlight);
   timeline = new Timeline($("timeline"), $("filters"), $("tip"), race, selectEvent);
   timeline.resize();
+  state.hiddenTypes = timeline.hidden;     // the map hides the track limits marks when they are filtered out
   overtakeList = new OvertakeList($("otList"), $("otNote"), race, selectEvent);
   $("otCount").textContent = `(${overtakeList.count})`;
   telemetryPanel = new TelemetryPanel($("tCards"), $("speedChart"), race, state.telemetry);
@@ -400,6 +406,7 @@ function applySettings(changedKey) {
   applyToPage(settings.values);
   refreshThemeColors();
   if (changedKey === null || changedKey === "tabOrder") applyTabOrder();
+  $("autoCam").checked = settings.values.autoCamera;
   if (changedKey === null || changedKey === "floating") floating.applySaved();
   if (changedKey === null || changedKey === "units") {
     if (overtakeList) refreshOvertakeList();            // the list shows speed differences
@@ -472,8 +479,11 @@ function setupControls() {
   // every time the box changes size, whatever the reason.
   new ResizeObserver(() => { if (map) { map.resize(); timeline.resize(); } }).observe($("mapWrap"));
 
+  setupMapMouse();
+
   // Highlight a driver by clicking his dot on the map.
   $("map").onclick = (e) => {
+    if (mapDragged) return;                       // the end of a drag is not a click
     const rect = $("map").getBoundingClientRect();
     const abbr = map.carAt(e.clientX - rect.left, e.clientY - rect.top);
     if (abbr) toggleHighlight(abbr);
@@ -487,6 +497,49 @@ function setupControls() {
     btn.onclick = () => showTab(btn.dataset.tab);
   }
   $("otOnlyHl").onchange = (e) => { state.onlyHighlighted = e.target.checked; refreshOvertakeList(); };
+}
+
+// Mouse on the map: the wheel zooms, dragging moves the map (see TrackMap.zoomBy / panBy).
+// Pointer events work for the mouse, a pen and a finger alike; setPointerCapture keeps sending the
+// moves to the map while the button is down, even when the pointer leaves it.
+let mapDragged = false;   // true when the last press of the button was a drag, not a click
+
+function setupMapMouse() {
+  const canvas = $("map");
+  let press = null;       // where the button went down and where the pointer was at the last move
+  canvas.addEventListener("wheel", (e) => {
+    if (!map) return;
+    e.preventDefault();                           // do not scroll the page
+    map.zoomBy(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY);   // wheel down = zoom out
+  }, { passive: false });
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    press = { x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY };
+    mapDragged = false;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!press || !map) return;
+    if (!mapDragged && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) return;   // a small shake is still a click
+    mapDragged = true;
+    map.panBy(e.clientX - press.lastX, e.clientY - press.lastY);
+    press.lastX = e.clientX;
+    press.lastY = e.clientY;
+  });
+  canvas.addEventListener("pointerup", () => { press = null; });
+  $("zoomIn").onclick = () => map && map.zoomBy(1.5);
+  $("zoomOut").onclick = () => map && map.zoomBy(1 / 1.5);
+  $("zoomFit").onclick = () => map && map.fitView();
+  $("autoCam").onchange = (e) => settings.set("autoCamera", e.target.checked);
+  $("followHl").onchange = (e) => setFollow(e.target.checked);
+}
+
+// "Follow": the camera follows the highlighted drivers. Without a highlighted driver it waits
+// (the map shows the normal view) and starts as soon as you click one.
+function setFollow(on) {
+  state.follow = on;
+  $("followHl").checked = on;
+  if (map) map.fitView();                         // forget a view chosen with the mouse
 }
 
 // The side tabs can be dragged to another place; the order is saved in the settings (tabOrder).
@@ -604,6 +657,10 @@ function setupKeys() {
     else if (key === "s") setSectors(!state.sectorsOn);
     else if (key === "m") setMini(!state.miniOn);
     else if (key === "?") $("keysHelp").hidden = !$("keysHelp").hidden;
+    else if (key === "0") map.fitView();
+    else if (key === "g") setFollow(!state.follow);
+    else if (key === "+" || key === "=") map.zoomBy(1.5);
+    else if (key === "-") map.zoomBy(1 / 1.5);
     else handled = false;
     if (handled) e.preventDefault();            // e.g. Space must not scroll the page or press a button
   });

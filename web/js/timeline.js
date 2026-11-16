@@ -3,6 +3,8 @@
 import { formatTime, esc } from "./util.js";
 import { colors } from "./theme.js";
 
+export const LIMITS_COLOR = "#9be15d";   // also used by the map marker (map.js drawTrackLimits)
+
 // One entry per event type. `lane` is the row of the strip, `shape` how it is drawn.
 export const TYPES = [
   { id: "overtake", label: "Overtakes", color: "#3aa0ff", lane: 0, shape: "dot" },
@@ -13,9 +15,11 @@ export const TYPES = [
   { id: "red", label: "Red flags", color: "#ff3b3b", lane: 3, shape: "band" },
   { id: "dnf", label: "Retirements", color: "#ff6fb0", lane: 4, shape: "diamond" },
   { id: "fastest", label: "Fastest lap", color: "#b266ff", lane: 4, shape: "diamond" },
+  // Track limits (deleted lap times) and "leaving the track" incidents, from race control.
+  { id: "limits", label: "Track limits", color: LIMITS_COLOR, lane: 5, shape: "triangle" },
 ];
 const TYPE_BY_ID = Object.fromEntries(TYPES.map((t) => [t.id, t]));
-const LANE_NAMES = ["Overtakes", "Pit stops", "SC / VSC", "Flags", "Retire / FL"];
+const LANE_NAMES = ["Overtakes", "Pit stops", "SC / VSC", "Flags", "Retire / FL", "Track limits"];
 
 const LEFT = 84;       // space for the lane names
 const RIGHT = 12;
@@ -147,6 +151,12 @@ export class Timeline {
     } else if (type.shape === "square") {
       ctx.fillRect(x - 2.5, cy - 2.5, 5, 5);
       if (isSelected) ctx.strokeRect(x - 4, cy - 4, 8, 8);
+    } else if (type.shape === "triangle") {    // a small warning sign
+      ctx.beginPath();
+      ctx.moveTo(x, cy - 4); ctx.lineTo(x + 4, cy + 4); ctx.lineTo(x - 4, cy + 4);
+      ctx.closePath();
+      ctx.fill();
+      if (isSelected) ctx.stroke();
     } else {                                   // diamond
       ctx.beginPath();
       ctx.moveTo(x, cy - 5); ctx.lineTo(x + 5, cy); ctx.lineTo(x, cy + 5); ctx.lineTo(x - 5, cy);
@@ -194,8 +204,10 @@ export class Timeline {
     this.canvas.style.cursor = hit ? "pointer" : "default";
     if (!hit) { this.tooltip.hidden = true; return; }
     const where = hit.corner ? ` at ${hit.corner}` : "";
-    this.tooltip.textContent =
-      `${formatTime(hit.t)}${hit.lap ? ` · lap ${hit.lap}` : ""} · ${hit.label}${where}`;
+    // Track limits: the label is short (it is also written on the map), `what` says more.
+    const text = hit.type === "limits" ? `${hit.drivers.join("/")}${hit.turn ? ` turn ${hit.turn}` : ""}: ${hit.what}`
+      : `${hit.label}${where}`;
+    this.tooltip.textContent = `${formatTime(hit.t)}${hit.lap ? ` · lap ${hit.lap}` : ""} · ${text}`;
     this.tooltip.hidden = false;
     // Place it above the strip, kept inside the window.
     const x = Math.min(e.clientX + 12, window.innerWidth - this.tooltip.offsetWidth - 8);

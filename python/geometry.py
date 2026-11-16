@@ -34,20 +34,41 @@ class TrackPath:
         self.length = float(self.length_of.sum())          # length of the whole lap
 
     def progress(self, x, y):
-        out = np.empty(len(x))
+        return self.project(x, y)[0]
+
+    def project(self, x, y, near=None, reach=10):
+        """Returns two arrays: the progress of every point (see above) and its distance to the path
+        (how far it is sideways from the line), both in data units.
+
+        Normally every point is compared with every segment. If the caller already knows roughly
+        where each point is, `near` = an array with a segment index per point, and only the segments
+        from near - reach to near + reach are tried: much faster on a path with thousands of segments.
+        """
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+        count = len(self.start)
+        progress = np.empty(len(x))
+        offset = np.empty(len(x))
         for first in range(0, len(x), 2000):               # in chunks to keep memory small
             px = x[first:first + 2000, None]
             py = y[first:first + 2000, None]
+            if near is None:
+                seg = np.arange(count)[None, :]            # every segment, for every point
+            else:                                          # (points, 2 * reach + 1) segment indexes
+                seg = (np.asarray(near[first:first + 2000])[:, None] + np.arange(-reach, reach + 1)) % count
+            sx, sy = self.start[seg, 0], self.start[seg, 1]
+            vx, vy = self.step[seg, 0], self.step[seg, 1]
             # Where on each segment is the closest point? 0 = its start, 1 = its end.
-            along = ((px - self.start[:, 0]) * self.step[:, 0] +
-                     (py - self.start[:, 1]) * self.step[:, 1]) / self.length_sq
-            along = np.clip(along, 0.0, 1.0)
-            dx = px - (self.start[:, 0] + along * self.step[:, 0])
-            dy = py - (self.start[:, 1] + along * self.step[:, 1])
-            best = np.argmin(dx * dx + dy * dy, axis=1)    # closest segment for every point
+            along = np.clip(((px - sx) * vx + (py - sy) * vy) / self.length_sq[seg], 0.0, 1.0)
+            dx = px - (sx + along * vx)
+            dy = py - (sy + along * vy)
+            squared = dx * dx + dy * dy
+            best = np.argmin(squared, axis=1)              # closest segment for every point
             rows = np.arange(len(best))
-            out[first:first + 2000] = self.before[best] + along[rows, best] * self.length_of[best]
-        return out
+            k = seg[rows, best] if near is not None else best
+            progress[first:first + 2000] = self.before[k] + along[rows, best] * self.length_of[k]
+            offset[first:first + 2000] = np.sqrt(squared[rows, best])
+        return progress, offset
 
     def stretch(self, from_distance, to_distance):
         """The points of the path between two distances along it (the second one may be past

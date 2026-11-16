@@ -2,11 +2,12 @@
 
 Files written per race, in data/<year>_<slug>/:
   meta.json       - race info, drivers (abbreviation, team colour), lap start times
-  track.json      - track outline + numbered corners
-  positions.json  - X/Y of every driver on a regular time grid
+  track.json      - track outline + numbered corners + the dense racing line (see track_line.py)
+  positions.json  - X/Y of every driver on a regular time grid, and distance along the racing line
   standings.json  - race order and gap to the car ahead, as "step" series (see export_leaderboard)
   strategy.json   - lap start times, tyre stints and pit stops per driver
-  events.json     - timeline events (overtakes, pit stops, flags, safety car, retirements, fastest lap)
+  events.json     - timeline events (overtakes, pit stops, flags, safety car, retirements, fastest lap,
+                    track limits / leaving the track, see detect_track_limits.py)
   racecontrol.json - race director messages (flags, investigations, penalties...), for the Messages tab
   racetrace.json  - end time of every lap of every driver, for the race trace chart
   minisectors.json - the lap in 25 pieces: track geometry of each piece + every driver's time in it
@@ -25,6 +26,7 @@ import data_loader
 import detect_events
 import detect_battles
 import detect_overtakes
+import detect_track_limits
 import export_leaderboard
 import export_minisectors
 import export_racecontrol
@@ -34,6 +36,7 @@ import export_teamradio
 import export_telemetry
 import export_weather
 import lap_timing
+import track_line
 from geometry import rotate
 
 
@@ -109,14 +112,22 @@ def build_meta(race, lap_starts):
     }
 
 
-def build_track(race, corners, rotation):
-    """Outline = path of the car during the fastest lap of the race."""
+def build_track(race, corners, rotation, line):
+    """Outline = path of the car during the fastest lap of the race (~305 points, also used by
+    mini-sectors, sectors and overtakes). `line` = the dense racing line (a TrackLine), one point
+    every ~2 m starting at the start/finish line: the cars move along it and the map draws it.
+    `length` = its length in data units, closing segment (last point -> first) included."""
     xy = rotate(lap_timing.fastest_lap_path(race), rotation)
 
     track = {
         "x": [int(v) for v in xy[:, 0]],
         "y": [int(v) for v in xy[:, 1]],
         "corners": [],
+        "line": {
+            "x": [int(v) for v in line.points[:, 0]],
+            "y": [int(v) for v in line.points[:, 1]],
+            "length": round(line.path.length, 1),
+        },
     }
     if corners is not None:
         cxy = rotate(corners[["X", "Y"]].to_numpy(dtype=float), rotation)
@@ -126,12 +137,16 @@ def build_track(race, corners, rotation):
     return track
 
 
-def build_positions(race, duration, rotation):
+def build_positions(race, duration, rotation, line):
     """Resample every driver's X/Y onto the same time grid (0, 1, 2, ... seconds).
 
     OpenF1 position samples are irregular (about 4 per second and different for
     each car). A common grid means that in the browser "time t" is simply
     index t of every array, and we only interpolate between neighbours.
+
+    `s` (same grid) = total distance driven along the racing line `line`, in 1/10 m, growing lap
+    after lap, null where the car is off the line (pit lane, garage, missing data). The browser
+    moves the car along the line with it and uses x/y only where s is null (see track_line.py).
     """
     grid = np.arange(0, duration, config.POSITION_STEP)
     out = {"step": config.POSITION_STEP, "drivers": {}}
@@ -148,6 +163,7 @@ def build_positions(race, duration, rotation):
         out["drivers"][abbr_of[number]] = {
             "x": [int(v) for v in xy[:, 0]],
             "y": [int(v) for v in xy[:, 1]],
+            "s": line.driven(number, grid),
         }
     return out
 
@@ -182,12 +198,26 @@ def export_race(year, gp, progress=lambda fraction, text: None):
         race, timing, retire_times, red_flags, meta["duration"], corners, rotation)
     events = sorted(other_events + overtakes, key=lambda e: e["t"])
 
+    progress(0.84, "Measuring the cars on the racing line")
+    line = track_line.TrackLine(race, rotation)
+    track = build_track(race, corners, rotation, line)
+
+    # Track limits need the racing line and the corners (where and when the car passed the turn).
+    limits, report = detect_track_limits.detect_track_limits(
+        race, timing, line, track["corners"], rotation, meta["duration"])
+    events = sorted(events + limits, key=lambda e: e["t"])
+    checks = np.abs(report["checks"])
+    print(f"  Track limits: {report['events']} events ({report['merged']} messages merged into earlier ones), "
+          f"{report['fromClock']} timed by the clock in the text"
+          + (f"; the driver passed the turn {np.median(checks):.1f} s (median) / {checks.max():.1f} s (max)"
+             f" from that clock time" if len(checks) else ""))
+
     progress(0.88, "Writing the files")
     folder = race_folder(race)
     folder.mkdir(parents=True, exist_ok=True)
     write_json(folder / "meta.json", meta)
-    write_json(folder / "track.json", build_track(race, corners, rotation))
-    write_json(folder / "positions.json", build_positions(race, meta["duration"], rotation))
+    write_json(folder / "track.json", track)
+    write_json(folder / "positions.json", build_positions(race, meta["duration"], rotation, line))
     write_json(folder / "standings.json", export_leaderboard.build_standings(race))
     write_json(folder / "strategy.json", export_leaderboard.build_strategy(race, lap_starts))
     write_json(folder / "events.json", {"events": events,

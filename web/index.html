@@ -34,6 +34,8 @@
       <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
       <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>5 seconds back / forward (with <kbd>Shift</kbd>: 30 s)</td></tr>
       <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Previous / next lap (in Highlights: previous / next moment)</td></tr>
+      <tr><td>Wheel / drag</td><td>Zoom / move the map (<kbd>0</kbd>: back to the automatic view)</td></tr>
+      <tr><td><kbd>G</kbd></td><td>Follow the highlighted drivers on / off (the others stay visible)</td></tr>
       <tr><td><kbd>F</kbd></td><td>Focus on the highlighted driver (or the leader); again to leave</td></tr>
       <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>Speed 1x, 2x, 5x, 10x</td></tr>
       <tr><td><kbd>H</kbd></td><td>Highlights mode on / off</td></tr>
@@ -54,6 +56,13 @@
   <main>
     <div id="mapWrap">
       <canvas id="map"></canvas>
+      <div id="mapTools">
+        <label id="followLabel" title="The camera follows the highlighted drivers (click a driver in the leaderboard or on the map): one driver stays in the middle, several are kept on the screen together. All the other cars stay visible. Zoom menu / mouse wheel = how much you see around them. Key G."><input type="checkbox" id="followHl"> Follow</label>
+        <label title="When the cars are close together (start, safety car) the map zooms on them"><input type="checkbox" id="autoCam"> Auto zoom</label>
+        <button id="zoomOut" title="Zoom out (mouse wheel)">&minus;</button>
+        <button id="zoomIn" title="Zoom in (mouse wheel)">+</button>
+        <button id="zoomFit" title="Back to the automatic view (key 0)">Fit</button>
+      </div>
       <div id="lapCounter">
         <div>LAP <b id="lapNow">1</b> / <span id="lapTotal">-</span></div>
         <div id="statusBadge" hidden></div>
@@ -174,7 +183,7 @@
 
   <!-- Version of this HTML file. js/main.js has its own number: if they differ, the browser is
        mixing an old cached file with a new one, and the page says so. Keep both in step. -->
-  <script>window.PAGE_VERSION = 12;</script>
+  <script>window.PAGE_VERSION = 14;</script>
   <!-- Chart.js 4.4.1, saved locally so the page also works offline. It defines the global "Chart". -->
   <script src="lib/chart.umd.min.js"></script>
   <!-- type="module" lets us split the code in files and use import/export -->

@@ -4,7 +4,8 @@
 // While the mode is on and the replay plays, the replay time jumps over everything between two
 // clips. The events come from the timeline, and so do the filters: an event type switched off
 // there is not played here. Yellow flags are never played (there are too many and they are
-// rarely worth watching), the safety car, virtual safety car and red flag are.
+// rarely worth watching), the safety car, virtual safety car and red flag are. Track limits are not
+// played either (Sao Paulo 2026 has 24 of them); the map shows them anyway when the replay passes.
 import { countUpTo } from "./replay.js";
 
 // Seconds of the race shown around the event: [before, after]. The event time is when it

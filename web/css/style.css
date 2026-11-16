@@ -406,3 +406,15 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 6px; text-align: cent
 .floatBody > div { flex: 1; min-height: 0; overflow-y: auto; }
 .floatWin [hidden] { display: none; }
 #sidebar.empty { display: none; }
+
+/* Zoom buttons in the top right corner of the map (js/main.js setupMapMouse) */
+#map { cursor: grab; touch-action: none; }
+#map:active { cursor: grabbing; }
+#mapTools {
+  position: absolute; top: 10px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px; background: var(--overlay); border: 1px solid var(--track); border-radius: 6px; font-size: 12px;
+}
+#mapTools button { min-width: 28px; padding: 2px 8px; }
+#mapTools label { margin-right: 4px; white-space: nowrap; }
+#miniPanel, #secPanel { top: 52px; }     /* below the zoom buttons */
+#followLabel { padding-right: 6px; border-right: 1px solid var(--track); }
